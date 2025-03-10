@@ -1,3 +1,10 @@
+"""
+TODO:
+- add pretax withdrawals to taxable income
+- RMDs
+- roth conversion up to bracket
+"""
+
 class FilingStatus:
     Single=0
     Married=1
@@ -85,8 +92,6 @@ class Balances:
             # take from taxable first
             if self.taxable+netcash>0: self.taxable+=netcash
             else: # try pretax next
-                # FIXME: NEED TO ADD PRETAX WITHDRAWALS TO TAXABLE INCOME
-                # FIXME: NEED TO ADD RMDS
                 self.taxable=0
                 netcash+=self.taxable
                 if self.pretax+netcash>0: self.pretax+=netcash
@@ -158,10 +163,6 @@ class People:
             p.age+=1
             if p.age==p.deathAge: removeIndices.append(i)
         for i in removeIndices: del self.people[i]
-    def number(self):
-        return len(self.people)
-    def alive(self):
-        return self.number()>0
 
 def printYear(year,people,balances):
     print(f"{year} {balances.income:4.0f} {balances.taxable:5.0f} {balances.roth:5.0f} {balances.pretax:5.0f} {balances.fedtax:4.0f} {balances.statetax:4.0f} {balances.filingStatus:2d}")
@@ -171,8 +172,8 @@ params = Params()
 people = People(params)
 balances = Balances(params)
 print("Year Incm  Txbl  Roth  Ptax  Fed   CA FS")
-while people.alive():
+while len(params.people)>0:
     balances.update()
-    printYear(params.startYear,people,balances)
-    params.startYear+=1
+    printYear(params.year,people,balances)
+    params.year+=1
     people.newYear()
