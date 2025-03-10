@@ -4,6 +4,16 @@ class FilingStatus:
     Single=0
     Married=1
 
+class RMD:
+    values = ((75,24.6), (76,23.7), (77,22.9), (78,22.0), (79,21.1), (80,20.2),
+              (81,19.4), (82,18.5), (83,17.7), (84,16.8), (85,16.0), (86,15.2),
+              (87,14.4), (88,13.7), (89,12.9), (90,12.2), (91,11.5), (92,10.8),
+              (93,10.1), (94,9.5), (95,8.9), (96,8.4), (99,6.8,), (100,6.4),
+              (101,6.0), (102,5.6), (103,5.2), (104,4.9), (105,4.6), (106,4.3),
+              (107,4.1), (108,3.9), (109,3.7), (110,3.5), (111,3.4), (112,3.3),
+              (113,3.1), (114,3.0), (115,2.9), (116,2.8), (117,2.7), (118,2.5),
+              (119,2.3), (120,2.0))
+
 class FedTax:
     # tax calculation requires brackets/rates in descending order
     brackets = (
@@ -77,6 +87,8 @@ class Balances:
             # take from taxable first
             if self.taxable+netcash>0: self.taxable+=netcash
             else: # try pretax next
+                # FIXME: NEED TO ADD PRETAX WITHDRAWALS TO TAXABLE INCOME
+                # FIXME: NEED TO ADD RMDS
                 self.taxable=0
                 netcash+=self.taxable
                 if self.pretax+netcash>0: self.pretax+=netcash
