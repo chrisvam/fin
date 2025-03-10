@@ -1,5 +1,3 @@
-import sys
-
 class FilingStatus:
     Single=0
     Married=1
@@ -95,7 +93,10 @@ class Balances:
                 else: # try roth
                     self.pretax=0
                     if self.roth+netcash>0: self.roth+=netcash
-                    else: print('*** bankrupt ***',sys.exit(-1))
+                    else:
+                        print('*** bankrupt ***')
+                        import sys
+                        sys.exit(-1)
                     
         # market returns
         self.pretax*=(1+self.params.marketReturn)
