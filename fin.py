@@ -56,15 +56,15 @@ class Balances:
         if len(self.people)==1: self.filingStatus=FilingStatus.Single
         else: self.filingStatus=FilingStatus.Married
 
-        income = self.calculateIncome()
+        income = self.calcIncome()
         # how much are we contributing to roth/pretax
-        roth,pretax = self.calculateRothAndPretax(income)
+        roth,pretax = self.calcRothAndPretax(income)
         capgains = self.taxable*self.params.marketReturn
         taxableIncome = income-pretax
-        self.fedtax = self.calculateTax(taxableIncome,FedTax) \
-            + self.calculateCapgainsTax(income,capgains)
+        self.fedtax = self.calcTax(taxableIncome,FedTax) \
+            + self.calcCapgainsTax(income,capgains)
         # california taxes capital gains as income
-        self.catax = self.calculateTax(taxableIncome+capgains,CaTax)
+        self.catax = self.calcTax(taxableIncome+capgains,CaTax)
         # update totals with our contributions
         tottax = self.fedtax+self.catax
         self.pretax += pretax
@@ -75,7 +75,7 @@ class Balances:
         self.roth*=(1+self.params.marketReturn)
         self.taxable*=(1+self.params.marketReturn)
 
-    def calculateRothAndPretax(self,income):
+    def calcRothAndPretax(self,income):
         roth=0
         pretax=0
         for p in self.people:
@@ -83,12 +83,12 @@ class Balances:
             pretax+=income*p.pretaxFraction
         return roth,pretax
 
-    def calculateIncome(self):
+    def calcIncome(self):
         income = 0
         for p in self.people: income+=p.salary
         return income
 
-    def calculateTax(self,income,taxtype):
+    def calcTax(self,income,taxtype):
         taxableIncome = income-taxtype.deduction[self.filingStatus]
         tax=0
         # depends on the tax bracket table being in descending order
@@ -101,7 +101,7 @@ class Balances:
                 #print('***',income,rate,brkt,amountInBracket,taxableIncome,filingStatus)
         return tax
 
-    def calculateCapgainsTax(self,income,capgains):
+    def calcCapgainsTax(self,income,capgains):
         for rate,brackets in zip(CapgainsTax.rates,CapgainsTax.brackets):
             if income>brackets[self.filingStatus]:
                 return rate*capgains
