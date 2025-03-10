@@ -3,7 +3,7 @@ class FilingStatus:
     Married=1
 
 class FedTax:
-    # tax calculation requires brackets in decending order
+    # tax calculation requires brackets/rates in decending order
     brackets = (
         (250.525,501.050),
         (197.300,394.600),
@@ -12,9 +12,10 @@ class FedTax:
         (11.925,23.850),
         (0,0))
     rates = (0.35,0.32,0.24,0.22,0.12,0.10)
-    deduction=(14.6,29.2)
+    deduction=(14.6,29.2) # single/married
 
 class CaTax:
+    # tax calculation requires brackets/rates in decending order
     brackets = (
         (721.315, 1442.629),
         (432.788, 865.575),
@@ -26,7 +27,7 @@ class CaTax:
         (10.757, 21.513),
         (0,0))
     rates = (0.123,0.113,0.103,0.093,0.08,0.06,0.04,0.02,0.01)
-    deduction = (5.54,11.08)
+    deduction = (5.54,11.08) # single/married
 
 class CapgainsTax:
     brackets=(
