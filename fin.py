@@ -33,7 +33,7 @@ class CapgainsTax:
         (533.400,600.050),
         (48.351,96.701),
         (0,0))
-    rates=(0.02,0.15,0.0)
+    rates=(0.20,0.15,0.0)
 
 class Person:
     def __init__(self,age,retireAge,deathAge,salary,pretaxFraction,rothFraction):
