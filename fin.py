@@ -1,9 +1,11 @@
+import sys
+
 class FilingStatus:
     Single=0
     Married=1
 
 class FedTax:
-    # tax calculation requires brackets/rates in decending order
+    # tax calculation requires brackets/rates in descending order
     brackets = (
         (250.525,501.050),
         (197.300,394.600),
@@ -14,8 +16,8 @@ class FedTax:
     rates = (0.35,0.32,0.24,0.22,0.12,0.10)
     deduction=(14.6,29.2) # single/married
 
-class CaTax:
-    # tax calculation requires brackets/rates in decending order
+class StateTax: # for california
+    # tax calculation requires brackets/rates in descending order
     brackets = (
         (721.315, 1442.629),
         (432.788, 865.575),
@@ -36,59 +38,84 @@ class CapgainsTax:
         (0,0))
     rates=(0.20,0.15,0.0)
 
-class Person:
-    def __init__(self,age,retireAge,deathAge,salary,pretaxFraction,rothFraction):
-        self.age = age
-        self.retireAge = retireAge
-        self.deathAge = deathAge
-        self.salary = salary
-        self.pretaxFraction = pretaxFraction
-        self.rothFraction = rothFraction
-        
 class Balances:
-    def __init__(self,params,people):
+    def __init__(self,params):
         self.params = params
         self.taxable = params.taxableStart
         self.pretax = params.pretaxStart
         self.roth = params.rothStart
-        self.people = people
+        self.people = params.people
         
     def update(self):
         if len(self.people)==1: self.filingStatus=FilingStatus.Single
         else: self.filingStatus=FilingStatus.Married
 
-        self.income = self.calcIncome()
+        self.income,self.socsecIncome = self.calcIncome()
+        self.income+=self.socsecIncome
+
         # how much are we contributing to roth/pretax
         roth,pretax = self.calcRothAndPretax(self.income)
+
+        # only federal taxes socsec
+        socsecTaxable = self.calcSocsecTaxable(self.income,self.socsecIncome)
         capgains = self.taxable*self.params.marketReturn
         taxableIncome = self.income-pretax
-        self.fedtax = self.calcTax(taxableIncome,FedTax) \
+        self.fedtax = self.calcTax(taxableIncome+socsecTaxable,FedTax) \
             + self.calcCapgainsTax(self.income,capgains)
         # california taxes capital gains as income
-        self.catax = self.calcTax(taxableIncome+capgains,CaTax)
+        self.statetax = self.calcTax(taxableIncome+capgains,StateTax)
         # update totals with our contributions
-        tottax = self.fedtax+self.catax
+        tottax = self.fedtax+self.statetax
+
         self.pretax += pretax
         self.roth += roth
-        self.taxable += self.income-roth-pretax-tottax-self.params.expenses
+        self.totExpenses = roth+pretax+tottax+self.params.expenses
+        netcash = self.income - self.totExpenses
+        if netcash > 0:
+            self.taxable += self.income-self.totExpenses
+        else:
+            # take from taxable first
+            if self.taxable+netcash>0: self.taxable+=netcash
+            else: # try pretax next
+                self.taxable=0
+                netcash+=self.taxable
+                if self.pretax+netcash>0: self.pretax+=netcash
+                else: # try roth
+                    self.pretax=0
+                    if self.roth+netcash>0: self.roth+=netcash
+                    else: print('*** bankrupt ***',sys.exit(-1))
+                    
         # market returns
         self.pretax*=(1+self.params.marketReturn)
         self.roth*=(1+self.params.marketReturn)
         self.taxable*=(1+self.params.marketReturn)
 
+    def calcSocsecTaxable(self,income,socsecIncome):
+        if self.filingStatus==FilingStatus.Single:
+            if income<25: return 0
+            elif income<34: return socsecIncome*0.5
+            else: return socsecIncome*0.85
+        if self.filingStatus==FilingStatus.Married:
+            if income<32: return 0
+            elif income<44: return socsecIncome*0.5
+            else: return socsecIncome*0.85
+        
     def calcRothAndPretax(self,income):
         roth=0
         pretax=0
         for p in self.people:
-            roth+=income*p.rothFraction
-            pretax+=income*p.pretaxFraction
+            if p.age < p.retireAge:
+                roth+=income*p.rothFraction
+                pretax+=income*p.pretaxFraction
         return roth,pretax
 
     def calcIncome(self):
         income = 0
+        socsecIncome = 0
         for p in self.people:
             if p.age < p.retireAge: income+=p.salary
-        return income
+            if p.age >= p.socsecAge: income+=p.socsecIncome
+        return income,socsecIncome
 
     def calcTax(self,income,taxtype):
         taxableIncome = income-taxtype.deduction[self.filingStatus]
@@ -111,31 +138,28 @@ class Balances:
         
 class People:
     def __init__(self,params):
-        self.people=[]
-        for i in range(2):
-            self.people.append(Person(params.ages[i],params.retireAges[i],params.deathages[i],params.salaries[i],params.pretaxFractions[i],params.rothFractions[i]))
-        self.year = params.startYear
+        self.people=params.people
     def newYear(self):
-        self.year+=1
-        remove = []
-        for person in self.people:
-            person.age+=1
-        remaining = [p for p in self.people if p.age < p.deathAge]
-        self.people = remaining
+        removeIndices = []
+        for i,p in enumerate(self.people):
+            p.age+=1
+            if p.age==p.deathAge: removeIndices.append(i)
+        for i in removeIndices: del self.people[i]
     def number(self):
         return len(self.people)
     def alive(self):
         return self.number()>0
 
-def printYear(people,balances):
-    print(f"{people.year} {balances.income:4.0f} {balances.taxable:5.0f} {balances.roth:5.0f} {balances.pretax:5.0f} {balances.fedtax:4.0f} {balances.catax:4.0f}")
+def printYear(year,people,balances):
+    print(f"{year} {balances.income:4.0f} {balances.taxable:5.0f} {balances.roth:5.0f} {balances.pretax:5.0f} {balances.fedtax:4.0f} {balances.statetax:4.0f} {balances.filingStatus:2d}")
 
 from finparams import Params
 params = Params()
 people = People(params)
-balances = Balances(params,people.people)
-print("Year Incm Txbl  Roth  Ptax  Fed   CA")
+balances = Balances(params)
+print("Year Incm  Txbl  Roth  Ptax  Fed   CA FS")
 while people.alive():
     balances.update()
-    printYear(people,balances)
+    printYear(params.startYear,people,balances)
+    params.startYear+=1
     people.newYear()
