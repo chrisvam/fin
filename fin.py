@@ -56,20 +56,20 @@ class Balances:
         if len(self.people)==1: self.filingStatus=FilingStatus.Single
         else: self.filingStatus=FilingStatus.Married
 
-        income = self.calcIncome()
+        self.income = self.calcIncome()
         # how much are we contributing to roth/pretax
-        roth,pretax = self.calcRothAndPretax(income)
+        roth,pretax = self.calcRothAndPretax(self.income)
         capgains = self.taxable*self.params.marketReturn
-        taxableIncome = income-pretax
+        taxableIncome = self.income-pretax
         self.fedtax = self.calcTax(taxableIncome,FedTax) \
-            + self.calcCapgainsTax(income,capgains)
+            + self.calcCapgainsTax(self.income,capgains)
         # california taxes capital gains as income
         self.catax = self.calcTax(taxableIncome+capgains,CaTax)
         # update totals with our contributions
         tottax = self.fedtax+self.catax
         self.pretax += pretax
         self.roth += roth
-        self.taxable += income-roth-pretax-tottax-self.params.expenses
+        self.taxable += self.income-roth-pretax-tottax-self.params.expenses
         # market returns
         self.pretax*=(1+self.params.marketReturn)
         self.roth*=(1+self.params.marketReturn)
@@ -85,7 +85,8 @@ class Balances:
 
     def calcIncome(self):
         income = 0
-        for p in self.people: income+=p.salary
+        for p in self.people:
+            if p.age < p.retireAge: income+=p.salary
         return income
 
     def calcTax(self,income,taxtype):
@@ -126,13 +127,13 @@ class People:
         return self.number()>0
 
 def printYear(people,balances):
-    print(f"{people.year} {balances.taxable:4.0f} {balances.roth:4.0f} {balances.pretax:4.0f} {balances.fedtax:4.0f} {balances.catax:4.0f}")
+    print(f"{people.year} {balances.income:4.0f} {balances.taxable:5.0f} {balances.roth:5.0f} {balances.pretax:5.0f} {balances.fedtax:4.0f} {balances.catax:4.0f}")
 
 from finparams import Params
 params = Params()
 people = People(params)
 balances = Balances(params,people.people)
-print("Year Txbl Roth Ptax Fed  CA  ")
+print("Year Incm Txbl  Roth  Ptax  Fed   CA")
 while people.alive():
     balances.update()
     printYear(people,balances)
