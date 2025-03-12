@@ -55,12 +55,13 @@ class Balances:
         capgains = self.taxable*self.params.marketReturn
         # hack: add in pretax withdrawn in previous year to this years taxes
         taxableIncome = self.income-pretaxContrib
-        fedTaxableIncome = taxableIncome+socsecTaxable
+        fedTaxableIncome = taxableIncome+socsecTaxable-FedTax.deduction[self.filingStatus]
 
         # optional roth conversion
         convertBracket=self.params.rothConvertBracket
+        self.convert=0
         if convertBracket>=0:
-            self.convert=FedTax.brackets[self.filingStatus][convertBracket]-fedTaxableIncome # max out this bracket
+            self.convert=min(FedTax.brackets[self.filingStatus][convertBracket]-fedTaxableIncome,self.pretax) # max out this bracket
             if self.convert>0:
                 taxableIncome+=self.convert # pay taxes on conversion
                 self.roth+=self.convert # add to roth
@@ -68,7 +69,8 @@ class Balances:
         self.fedtax = self.calcTax(fedTaxableIncome,FedTax) \
             + self.calcCapgainsTax(self.income,capgains)
         # california taxes capital gains as income
-        self.statetax = self.calcTax(taxableIncome+capgains,StateTax)
+        stateTaxableIncome  = taxableIncome+capgains-StateTax.deduction[self.filingStatus]
+        self.statetax = self.calcTax(stateTaxableIncome,StateTax)
         # update totals with our contributions
         tottax = self.fedtax+self.statetax
 
@@ -142,15 +144,14 @@ class Balances:
         return income,socsecIncome
 
     def calcTax(self,income,taxtype):
-        taxableIncome = income-taxtype.deduction[self.filingStatus]
         tax=0
         # depends on the tax bracket table being in descending order
         for rate,bracket in zip(taxtype.rates,taxtype.brackets[self.filingStatus]):
             brkt = bracket
-            if taxableIncome>=brkt:
-                amountInBracket = taxableIncome-brkt
+            if income>=brkt:
+                amountInBracket = income-brkt
                 tax += rate*amountInBracket
-                taxableIncome -= amountInBracket
+                income -= amountInBracket
                 #print('***',income,rate,brkt,amountInBracket,taxableIncome,filingStatus)
         return tax
 
@@ -160,26 +161,14 @@ class Balances:
                 return rate*capgains
         return 0
         
-class People:
-    def __init__(self,params):
-        self.people=params.people
-    def newYear(self):
-        removeIndices = []
-        for i,p in enumerate(self.people):
-            p.age+=1
-            if p.age==p.deathAge: removeIndices.append(i)
-        for i in removeIndices: del self.people[i]
-
 def printYear(year,people,balances):
     print(f"{year} {balances.income:4.0f} {balances.taxable:5.0f} {balances.roth:5.0f} {balances.pretax:5.0f} {balances.fedtax:4.0f} {balances.statetax:4.0f} {balances.rmd:4.0f} {balances.pretaxWithdrawn:4.0f} {balances.convert:4.0f} {balances.filingStatus:2d}")
 
 from finparams import Params
 params = Params()
-people = People(params)
 balances = Balances(params)
 print("Year Incm  Txbl  Roth  Ptax  Fed   CA  RMD PtxW Cnvt FS")
-while len(params.people)>0:
+while params.alive():
     balances.update()
-    printYear(params.year,people,balances)
-    params.year+=1
-    people.newYear()
+    printYear(params.year,params.people,balances)
+    params.newYear()
