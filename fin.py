@@ -10,6 +10,25 @@ RMDTable = ((75,24.6), (76,23.7), (77,22.9), (78,22.0), (79,21.1), (80,20.2),
             (113,3.1), (114,3.0), (115,2.9), (116,2.8), (117,2.7), (118,2.5),
             (119,2.3), (120,2.0))
 
+class Person:
+    def __init__(self, dictionary):
+        for k, v in dictionary.items():
+            setattr(self, k, v)
+
+class Params:
+    def __init__(self, dictionary):
+        for k, v in dictionary.items():
+            setattr(self, k, v)
+    def alive(self):
+        return len(self.people)
+    def newYear(self):
+        self.year+=1
+        removeIndices = []
+        for i,p in enumerate(self.people):
+            p.age+=1
+            if p.age==p.deathAge: removeIndices.append(i)
+        for i in removeIndices: del self.people[i]
+
 class FedTax:
     # tax calculation requires brackets/rates in descending order
     brackets = ((250.525,197.300,103.350,48.475,11.925,0), # single
@@ -164,8 +183,9 @@ class Balances:
 def printYear(year,people,balances):
     print(f"{year} {balances.income:4.0f} {balances.taxable:5.0f} {balances.roth:5.0f} {balances.pretax:5.0f} {balances.fedtax:4.0f} {balances.statetax:4.0f} {balances.rmd:4.0f} {balances.pretaxWithdrawn:4.0f} {balances.convert:4.0f} {balances.filingStatus:2d}")
 
-from finparams import Params
-params = Params()
+from finparams import modelParams,personParams
+params = Params(modelParams)
+params.people = [Person(personParams[0]),Person(personParams[1])]
 balances = Balances(params)
 print("Year Incm  Txbl  Roth  Ptax  Fed   CA  RMD PtxW Cnvt FS")
 while params.alive():
