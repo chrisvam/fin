@@ -34,7 +34,7 @@ class Person:
         for k, v in dictionary.items():
             setattr(self, k, v)
 
-class Params:
+class Model:
     def __init__(self, dictionary):
         for k, v in dictionary.items():
             setattr(self, k, v)
@@ -49,12 +49,12 @@ class Params:
         for i in removeIndices: del self.people[i]
 
 class Balances:
-    def __init__(self,params):
-        self.params = params
-        self.taxable = params.taxableStart
-        self.pretax = params.pretaxStart
-        self.roth = params.rothStart
-        self.people = params.people
+    def __init__(self,model):
+        self.model = model
+        self.taxable = model.taxableStart
+        self.pretax = model.pretaxStart
+        self.roth = model.rothStart
+        self.people = model.people
         self.pretaxWithdrawn=0 # hack for computing pretax taxes next year
         
     def update(self):
@@ -71,13 +71,13 @@ class Balances:
 
         # only federal taxes socsec
         socsecTaxable = self.calcSocsecTaxable(self.income,self.socsecIncome)
-        capgains = self.taxable*self.params.marketReturn
+        capgains = self.taxable*self.model.marketReturn
         # hack: add in pretax withdrawn in previous year to this years taxes
         taxableIncome = self.income-pretaxContrib
         fedTaxableIncome = taxableIncome+socsecTaxable-FedTax.deduction[self.filingStatus]
 
         # optional roth conversion
-        convertBracket=self.params.rothConvertBracket
+        convertBracket=self.model.rothConvertBracket
         self.convert=0
         if convertBracket>=0:
             self.convert=min(FedTax.brackets[self.filingStatus][convertBracket]-fedTaxableIncome,self.pretax) # max out this bracket
@@ -95,7 +95,7 @@ class Balances:
 
         self.pretax += pretaxContrib
         self.roth += rothContrib
-        self.totExpenses = rothContrib+pretaxContrib+tottax+self.params.expenses
+        self.totExpenses = rothContrib+pretaxContrib+tottax+self.model.expenses
         # hack: will compute taxes on this next year
         self.pretaxWithdrawn=0
         netcash = self.income - self.totExpenses
@@ -122,9 +122,9 @@ class Balances:
                         sys.exit(-1)
                     
         # market returns
-        self.pretax*=(1+self.params.marketReturn)
-        self.roth*=(1+self.params.marketReturn)
-        self.taxable*=(1+self.params.marketReturn)
+        self.pretax*=(1+self.model.marketReturn)
+        self.roth*=(1+self.model.marketReturn)
+        self.taxable*=(1+self.model.marketReturn)
 
     def calcSocsecTaxable(self,income,socsecIncome):
         if self.filingStatus==Single:
@@ -184,11 +184,11 @@ def printYear(year,people,balances):
     print(f"{year} {balances.income:4.0f} {balances.taxable:5.0f} {balances.roth:5.0f} {balances.pretax:5.0f} {balances.fedtax:4.0f} {balances.statetax:4.0f} {balances.rmd:4.0f} {balances.pretaxWithdrawn:4.0f} {balances.convert:4.0f} {balances.filingStatus:2d}")
 
 from finparams import modelParams,personParams
-params = Params(modelParams)
-params.people = [Person(personParams[0]),Person(personParams[1])]
-balances = Balances(params)
+model = Model(modelParams)
+model.people = [Person(personParams[0]),Person(personParams[1])]
+balances = Balances(model)
 print("Year Incm  Txbl  Roth  Ptax  Fed   CA  RMD PtxW Cnvt FS")
-while params.alive():
+while model.alive():
     balances.update()
-    printYear(params.year,params.people,balances)
-    params.newYear()
+    printYear(model.year,model.people,balances)
+    model.newYear()
