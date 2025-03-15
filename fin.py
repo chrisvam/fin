@@ -75,6 +75,8 @@ class Balances:
         capgains = self.taxable*self.model.marketReturn
         taxableIncome = self.income-pretaxContrib
         fedTaxableIncome = taxableIncome+socsecTaxable-FedTax.deduction[self.filingStatus]
+        # california taxes capital gains as income, but not socsec
+        stateTaxableIncome  = taxableIncome+capgains-StateTax.deduction[self.filingStatus]
 
         # optional roth conversion
         convertBracket=self.model.rothConvertBracket
@@ -83,12 +85,11 @@ class Balances:
             self.convert=min(FedTax.brackets[self.filingStatus][convertBracket]-fedTaxableIncome,self.pretax) # max out this bracket
             if self.convert>0:
                 fedTaxableIncome+=self.convert # pay taxes on conversion
+                stateTaxableIncome+=self.convert # pay taxes on conversion
                 self.roth+=self.convert # add to roth
                 self.pretax-=self.convert # remove from pretax
         self.fedtax = self.calcTax(fedTaxableIncome,FedTax) \
             + self.calcCapgainsTax(self.income,capgains)
-        # california taxes capital gains as income
-        stateTaxableIncome  = taxableIncome+capgains-StateTax.deduction[self.filingStatus]
         self.statetax = self.calcTax(stateTaxableIncome,StateTax)
         # update totals with our contributions
         tottax = self.fedtax+self.statetax
