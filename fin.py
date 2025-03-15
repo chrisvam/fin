@@ -62,17 +62,17 @@ class Balances:
         else: self.filingStatus=Married
 
         self.income,self.socsecIncome = self.calcIncome()
-        self.rmd = self.calcRMD()
-        self.pretax-=self.rmd
-        self.income+=self.socsecIncome+self.rmd+self.pretaxWithdrawn
-
         # how much are we contributing to roth/pretax
         rothContrib,pretaxContrib = self.calcRothAndPretaxContrib(self.income)
+        self.rmd = self.calcRMD()
+        self.pretax-=self.rmd
+        # hack: add in last last year's pretax withdrawal to this year's income
+        # this avoids recursion loops
+        self.income+=(self.rmd+self.pretaxWithdrawn)
 
         # only federal taxes socsec
         socsecTaxable = self.calcSocsecTaxable(self.income,self.socsecIncome)
         capgains = self.taxable*self.model.marketReturn
-        # hack: add in pretax withdrawn in previous year to this years taxes
         taxableIncome = self.income-pretaxContrib
         fedTaxableIncome = taxableIncome+socsecTaxable-FedTax.deduction[self.filingStatus]
 
@@ -82,7 +82,7 @@ class Balances:
         if convertBracket>=0:
             self.convert=min(FedTax.brackets[self.filingStatus][convertBracket]-fedTaxableIncome,self.pretax) # max out this bracket
             if self.convert>0:
-                taxableIncome+=self.convert # pay taxes on conversion
+                fedTaxableIncome+=self.convert # pay taxes on conversion
                 self.roth+=self.convert # add to roth
                 self.pretax-=self.convert # remove from pretax
         self.fedtax = self.calcTax(fedTaxableIncome,FedTax) \
@@ -127,13 +127,14 @@ class Balances:
         self.taxable*=(1+self.model.marketReturn)
 
     def calcSocsecTaxable(self,income,socsecIncome):
+        provisionalIncome = income + 0.5*socsecIncome # ignoring non-taxable interest
         if self.filingStatus==Single:
-            if income<25: return 0
-            elif income<34: return socsecIncome*0.5
+            if provisionalIncome<25: return 0
+            elif provisionalIncome<34: return socsecIncome*0.5
             else: return socsecIncome*0.85
         if self.filingStatus==Married:
-            if income<32: return 0
-            elif income<44: return socsecIncome*0.5
+            if provisionalIncome<32: return 0
+            elif provisionalIncome<44: return socsecIncome*0.5
             else: return socsecIncome*0.85
         
     def calcRothAndPretaxContrib(self,income):
@@ -157,18 +158,20 @@ class Balances:
     def calcIncome(self):
         income = 0
         socsecIncome = 0
+        socsecPayrollTax = 0
         for p in self.people:
             if p.age < p.retireAge: income+=p.salary
-            if p.age >= p.socsecAge: income+=p.socsecIncome
+            if p.age >= p.socsecAge: socsecIncome+=p.socsecIncome
+            socsecSalary = min(p.salary,176.1)
+            income -= 0.062*socsecSalary # remove socsec payroll taxes
         return income,socsecIncome
 
     def calcTax(self,income,taxtype):
         tax=0
         # depends on the tax bracket table being in descending order
         for rate,bracket in zip(taxtype.rates,taxtype.brackets[self.filingStatus]):
-            brkt = bracket
-            if income>=brkt:
-                amountInBracket = income-brkt
+            if income>=bracket:
+                amountInBracket = income-bracket
                 tax += rate*amountInBracket
                 income -= amountInBracket
                 #print('***',income,rate,brkt,amountInBracket,taxableIncome,filingStatus)
