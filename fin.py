@@ -69,6 +69,7 @@ class Balances:
         # hack: add in last last year's pretax withdrawal to this year's income
         # this avoids recursion loops
         self.income+=(self.rmd+self.pretaxWithdrawn)
+        self.totincome = self.income+self.socsecIncome
 
         # only federal taxes socsec
         socsecTaxable = self.calcSocsecTaxable(self.income,self.socsecIncome)
@@ -159,12 +160,12 @@ class Balances:
     def calcIncome(self):
         income = 0
         socsecIncome = 0
-        socsecPayrollTax = 0
         for p in self.people:
-            if p.age < p.retireAge: income+=p.salary
+            if p.age < p.retireAge:
+                income+=p.salary
+                socsecSalary = min(p.salary,176.1)
+                income -= 0.062*socsecSalary # remove socsec payroll taxes
             if p.age >= p.socsecAge: socsecIncome+=p.socsecIncome
-            socsecSalary = min(p.salary,176.1)
-            income -= 0.062*socsecSalary # remove socsec payroll taxes
         return income,socsecIncome
 
     def calcTax(self,income,taxtype):
@@ -185,7 +186,7 @@ class Balances:
         return 0
         
 def printYear(year,people,balances):
-    print(f"{year} {balances.income:4.0f} {balances.taxable:5.0f} {balances.roth:5.0f} {balances.pretax:5.0f} {balances.fedtax:4.0f} {balances.statetax:4.0f} {balances.rmd:4.0f} {balances.pretaxWithdrawn:4.0f} {balances.convert:4.0f} {balances.filingStatus:2d}")
+    print(f"{year} {balances.totincome:4.0f} {balances.taxable:5.0f} {balances.roth:5.0f} {balances.pretax:5.0f} {balances.fedtax:4.0f} {balances.statetax:4.0f} {balances.rmd:4.0f} {balances.pretaxWithdrawn:4.0f} {balances.convert:4.0f} {balances.filingStatus:2d}")
 
 from finparams import modelParams,personParams
 model = Model(modelParams)
