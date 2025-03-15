@@ -89,6 +89,7 @@ class Balances:
                 stateTaxableIncome+=self.convert # pay taxes on conversion
                 self.roth+=self.convert # add to roth
                 self.pretax-=self.convert # remove from pretax
+            else: self.convert=0
         self.fedtax = self.calcTax(fedTaxableIncome,FedTax) \
             + self.calcCapgainsTax(self.income,capgains)
         self.statetax = self.calcTax(stateTaxableIncome,StateTax)
