@@ -83,13 +83,12 @@ class Balances:
         convertBracket=self.model.rothConvertBracket
         self.convert=0
         if convertBracket>=0:
-            self.convert=min(FedTax.brackets[self.filingStatus][convertBracket]-fedTaxableIncome,self.pretax) # max out this bracket
+            self.convert=max(min(FedTax.brackets[self.filingStatus][convertBracket]-fedTaxableIncome,self.pretax),0) # max out this bracket
             if self.convert>0:
                 fedTaxableIncome+=self.convert # pay taxes on conversion
                 stateTaxableIncome+=self.convert # pay taxes on conversion
                 self.roth+=self.convert # add to roth
                 self.pretax-=self.convert # remove from pretax
-            else: self.convert=0
         self.fedtax = self.calcTax(fedTaxableIncome,FedTax) \
             + self.calcCapgainsTax(self.income,capgains)
         self.statetax = self.calcTax(stateTaxableIncome,StateTax)
