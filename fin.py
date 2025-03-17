@@ -128,16 +128,27 @@ class Balances:
         self.roth*=(1+self.model.marketReturn)
         self.taxable*=(1+self.model.marketReturn)
 
-    def calcSocsecTaxable(self,income,socsecIncome):
-        provisionalIncome = income + 0.5*socsecIncome # ignoring non-taxable interest
-        if self.filingStatus==Single:
-            if provisionalIncome<25: return 0
-            elif provisionalIncome<34: return socsecIncome*0.5
-            else: return socsecIncome*0.85
-        if self.filingStatus==Married:
-            if provisionalIncome<32: return 0
-            elif provisionalIncome<44: return socsecIncome*0.5
-            else: return socsecIncome*0.85
+    # cpo doesn't understand this, but the results from this chatGPT
+    # generated code seem to agree with the calculator here:
+    # https://www.covisum.com/resources/taxable-social-security-calculator
+    def calcSocsecTaxable(self, income, socsecIncome):
+        # simplifying assumption: assume tax-exempt interest is 0
+        provisional_income = income + 0.5 * socsecIncome
+    
+        if self.filingStatus == Single:
+            base1, base2 = 25000, 34000
+        elif self.filingStatus == Married:
+            base1, base2 = 32000, 44000
+    
+        if provisional_income <= base1:
+            taxable_ssi = 0
+        elif provisional_income <= base2:
+            taxable_ssi = 0.5 * (provisional_income - base1)
+        else:
+            taxable_ssi = 0.85 * (provisional_income - base2) + 0.5 * (base2 - base1)
+            taxable_ssi = min(taxable_ssi, 0.85 * socsecIncome)
+        
+        return taxable_ssi
         
     def calcRothAndPretaxContrib(self,income):
         roth=0
