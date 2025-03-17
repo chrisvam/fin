@@ -131,6 +131,8 @@ class Balances:
     # cpo doesn't understand this, but the results from this chatGPT
     # generated code seem to agree with the calculator here:
     # https://www.covisum.com/resources/taxable-social-security-calculator
+    # another interesting paper here:
+    # https://www.financialplanningassociation.org/sites/default/files/2020-09/July2018_Contribution_Reichenstein.pdf
     def calcSocsecTaxable(self, income, socsecIncome):
         # simplifying assumption: assume tax-exempt interest is 0
         provisional_income = income + 0.5 * socsecIncome
@@ -150,6 +152,27 @@ class Balances:
         
         return taxable_ssi
         
+    # courtesy of chatGPT
+    def calculate_irmaa(incom):
+        # subject to change, so check the latest thresholds
+        irmaa_thresholds = (((91000, 114000, 68, 12.40),
+                             (114000, 142000, 170.10, 31.90),
+                             (142000, 170000, 272.20, 51.40),
+                             (170000, 500000, 374.20, 70.90),
+                             (500000, float('inf'), 408.20, 77.90)),
+                            ((182000, 228000, 68, 12.40),
+                             (228000, 284000, 170.10, 31.90),
+                             (284000, 340000, 272.20, 51.40),
+                             (340000, 750000, 374.20, 70.90),
+                             (750000, float('inf'), 408.20, 77.90)))
+
+        for threshold in irmaa_thresholds[self.filingStatus]:
+            low, high, part_b, part_d = threshold
+            if low < magi <= high:
+                return part_b, part_d
+    
+        return 0, 0
+
     def calcRothAndPretaxContrib(self,income):
         roth=0
         pretax=0
