@@ -233,13 +233,13 @@ class Balances:
         return 0
         
 def printYear(year,people,balances):
-    print(f"{year} {balances.totincome:4.0f} {balances.taxable:5.0f} {balances.roth:5.0f} {balances.pretax:5.0f} {balances.fedtax:4.0f} {balances.statetax:4.0f} {balances.rmd:4.0f} {balances.pretaxWithdrawn:4.0f} {balances.convert:4.0f} {balances.irmaa:4.0f} {balances.filingStatus:2d}")
+    print(f"{year} {balances.totincome:4.0f} {balances.totExpenses:4.0f} {balances.taxable:5.0f} {balances.roth:5.0f} {balances.pretax:5.0f} {balances.fedtax:4.0f} {balances.statetax:4.0f} {balances.rmd:4.0f} {balances.pretaxWithdrawn:4.0f} {balances.convert:4.0f} {balances.irmaa:4.0f} {balances.filingStatus:2d}")
 
 from finparams import modelParams,personParams
 model = Model(modelParams)
 model.people = [Person(personParams[0]),Person(personParams[1])]
 balances = Balances(model)
-print("Year Incm  Txbl  Roth  Ptax  Fed   CA  RMD PtxW Cnvt Irma FS")
+print("Year Incm Exps  Txbl  Roth  Ptax  Fed   CA  RMD PtxW Cnvt Irma FS")
 while model.alive():
     balances.update()
     printYear(model.year,model.people,balances)
