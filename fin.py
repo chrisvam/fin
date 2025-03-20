@@ -1,3 +1,5 @@
+from collections import deque
+
 Single=0
 Married=1
 
@@ -56,7 +58,8 @@ class Balances:
         self.roth = model.rothStart
         self.people = model.people
         self.pretaxWithdrawn=0 # hack for computing pretax taxes next year
-        
+        self.incomeLookback=deque(maxlen=3)
+
     def update(self):
         if len(self.people)==1: self.filingStatus=Single
         else: self.filingStatus=Married
@@ -76,6 +79,7 @@ class Balances:
         capgains = self.taxable*self.model.marketReturn
         taxableIncome = self.income-pretaxContrib
         fedTaxableIncome = taxableIncome+socsecTaxable-FedTax.deduction[self.filingStatus]
+        self.incomeLookback.append(fedTaxableIncome) # simplification: this is not magi
         # california taxes capital gains as income, but not socsec
         stateTaxableIncome  = taxableIncome+capgains-StateTax.deduction[self.filingStatus]
 
@@ -97,7 +101,8 @@ class Balances:
 
         self.pretax += pretaxContrib
         self.roth += rothContrib
-        self.totExpenses = rothContrib+pretaxContrib+tottax+self.model.expenses
+        self.irmaa = self.calcIrmaaTot(self.incomeLookback[0]) 
+        self.totExpenses = rothContrib+pretaxContrib+tottax+self.model.expenses+self.irmaa
         # hack: will compute taxes on this next year
         self.pretaxWithdrawn=0
         netcash = self.income - self.totExpenses
@@ -153,25 +158,26 @@ class Balances:
         return taxable_ssi
         
     # courtesy of chatGPT
-    def calculate_irmaa(incom):
+    def calcIrmaa(self,magi):
+        # this income "looks back" 2 years
         # subject to change, so check the latest thresholds
-        irmaa_thresholds = (((91000, 114000, 68, 12.40),
-                             (114000, 142000, 170.10, 31.90),
-                             (142000, 170000, 272.20, 51.40),
-                             (170000, 500000, 374.20, 70.90),
-                             (500000, float('inf'), 408.20, 77.90)),
-                            ((182000, 228000, 68, 12.40),
-                             (228000, 284000, 170.10, 31.90),
-                             (284000, 340000, 272.20, 51.40),
-                             (340000, 750000, 374.20, 70.90),
-                             (750000, float('inf'), 408.20, 77.90)))
+        irmaa_thresholds = (((91, 114, 68, 12.40),
+                             (114, 142, 170.10, 31.90),
+                             (142, 170, 272.20, 51.40),
+                             (170, 500, 374.20, 70.90),
+                             (500, float('inf'), 408.20, 77.90)),
+                            ((182, 228, 68, 12.40),
+                             (228, 284, 170.10, 31.90),
+                             (284, 340, 272.20, 51.40),
+                             (340, 750, 374.20, 70.90),
+                             (750, float('inf'), 408.20, 77.90)))
 
         for threshold in irmaa_thresholds[self.filingStatus]:
             low, high, part_b, part_d = threshold
             if low < magi <= high:
-                return part_b, part_d
+                return 12*part_b/1000 + 12*part_d/1000 # convert to annual kilobucks 
     
-        return 0, 0
+        return 0
 
     def calcRothAndPretaxContrib(self,income):
         roth=0
@@ -181,6 +187,13 @@ class Balances:
                 roth+=income*p.rothFraction
                 pretax+=income*p.pretaxFraction
         return roth,pretax
+
+    def calcIrmaaTot(self,income):
+        irmaa = 0
+        for p in self.people:
+            if p.age >= p.retireAge:
+                irmaa+=self.calcIrmaa(income)
+        return irmaa
 
     def calcRMD(self):
         # simplification: assume both spouses are same age so
@@ -220,13 +233,13 @@ class Balances:
         return 0
         
 def printYear(year,people,balances):
-    print(f"{year} {balances.totincome:4.0f} {balances.taxable:5.0f} {balances.roth:5.0f} {balances.pretax:5.0f} {balances.fedtax:4.0f} {balances.statetax:4.0f} {balances.rmd:4.0f} {balances.pretaxWithdrawn:4.0f} {balances.convert:4.0f} {balances.filingStatus:2d}")
+    print(f"{year} {balances.totincome:4.0f} {balances.taxable:5.0f} {balances.roth:5.0f} {balances.pretax:5.0f} {balances.fedtax:4.0f} {balances.statetax:4.0f} {balances.rmd:4.0f} {balances.pretaxWithdrawn:4.0f} {balances.convert:4.0f} {balances.irmaa:4.0f} {balances.filingStatus:2d}")
 
 from finparams import modelParams,personParams
 model = Model(modelParams)
 model.people = [Person(personParams[0]),Person(personParams[1])]
 balances = Balances(model)
-print("Year Incm  Txbl  Roth  Ptax  Fed   CA  RMD PtxW Cnvt FS")
+print("Year Incm  Txbl  Roth  Ptax  Fed   CA  RMD PtxW Cnvt Irma FS")
 while model.alive():
     balances.update()
     printYear(model.year,model.people,balances)
