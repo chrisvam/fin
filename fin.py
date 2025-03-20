@@ -79,7 +79,6 @@ class Balances:
         capgains = self.taxable*self.model.marketReturn
         taxableIncome = self.income-pretaxContrib
         fedTaxableIncome = taxableIncome+socsecTaxable-FedTax.deduction[self.filingStatus]
-        self.incomeLookback.append(fedTaxableIncome) # simplification: this is not magi
         # california taxes capital gains as income, but not socsec
         stateTaxableIncome  = taxableIncome+capgains-StateTax.deduction[self.filingStatus]
 
@@ -93,6 +92,7 @@ class Balances:
                 stateTaxableIncome+=self.convert # pay taxes on conversion
                 self.roth+=self.convert # add to roth
                 self.pretax-=self.convert # remove from pretax
+        self.incomeLookback.append(fedTaxableIncome) # simplification: this is not magi
         self.fedtax = self.calcTax(fedTaxableIncome,FedTax) \
             + self.calcCapgainsTax(self.income,capgains)
         self.statetax = self.calcTax(stateTaxableIncome,StateTax)
@@ -101,7 +101,7 @@ class Balances:
 
         self.pretax += pretaxContrib
         self.roth += rothContrib
-        self.irmaa = self.calcIrmaaTot(self.incomeLookback[0]) 
+        self.irmaa = self.calcIrmaaTot(self.incomeLookback[0])
         self.totExpenses = rothContrib+pretaxContrib+tottax+self.model.expenses+self.irmaa
         # hack: will compute taxes on this next year
         self.pretaxWithdrawn=0
