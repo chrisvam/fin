@@ -3,6 +3,24 @@ from collections import deque
 Single=0
 Married=1
 
+# from 1871 thru 2024 from https://www.multpl.com/inflation-adjusted-s-p-500/table/by-year
+SandP_InflationCorrectedReturns_Since1871=[
+    4948.65,4205.59,5167.98,4607.21,4036.85,3290.63,3575.46,2976.21,2572.57,
+    2756.84,2474.87,2042.21,1822.76,1850.18,1647.21,1302.29,2075.01,2235.07,
+    2048.49,1968.01,1942.60,1566.22,2045.24,2423.13,2682.87,2414.47,1893.76,
+    1529.89,1264.14,983.34,1027.74,969.56,957.11,768.19,847.71,748.66,687.78,755.61,
+    603.46,516.70,518.75,468.71,395.15,485.63,452.82,463.76,458.72,563.66,553.41,
+    442.42,655.18,882.92,798.43,746.21,758.96,910.18,885.38,815.42,932.23,876.85,785.95,
+    679.86,731.38,636.62,629.16,609.27,456.74,522.89,523.33,423.56,300.67,312.66,289.98,
+    265.27,228.18,203.31,198.78,224.73,314.53,240.75,216.34,189.66,180.69,237.69,281.10,
+    283.63,253.02,396.30,316.75,216.30,253.66,174.60,184.38,319.27,403.31,461.83,321.89,
+    243.25,224.50,194.28,162.14,168.29,137.22,118.88,145.34,151.13,163.60,259.84,284.99,
+    235.27,265.89,301.46,317.32,319.05,323.45,321.94,251.28,343.16,370.18,316.17,256.29,
+    310.33,326.52,291.30,245.29,285.72,232.77,207.20,203.67,205.49,200.34,225.59,238.79,
+    197.12,224.58,208.33,201.53,221.85,206.74,162.67,178.28,184.75,184.74,208.75,162.49,
+    137.35,111.86,103.08,130.58,125.30,119.67,125.45,122.05,113.20]
+SandP_InflationCorrectedReturns_Since1871.reverse()
+
 RMDTable = ((75,24.6), (76,23.7), (77,22.9), (78,22.0), (79,21.1), (80,20.2),
             (81,19.4), (82,18.5), (83,17.7), (84,16.8), (85,16.0), (86,15.2),
             (87,14.4), (88,13.7), (89,12.9), (90,12.2), (91,11.5), (92,10.8),
@@ -59,8 +77,18 @@ class Balances:
         self.people = model.people
         self.pretaxWithdrawn=0 # hack for computing pretax taxes next year
         self.incomeLookback=deque(maxlen=3)
+        self.marketReturnsIndex = self.model.SandPReturnsStartYear-1871
 
     def update(self):
+        if self.model.SandPReturnsStartYear > 0 and \
+            self.marketReturnsIndex+1<len(SandP_InflationCorrectedReturns_Since1871)-1 :
+            # use historical inflation-corrected market return data
+            lastYear = SandP_InflationCorrectedReturns_Since1871[self.marketReturnsIndex]
+            thisYear = SandP_InflationCorrectedReturns_Since1871[self.marketReturnsIndex+1]
+            self.model.marketReturn = (thisYear/lastYear)-1
+            self.marketReturnsIndex+=1
+        else:
+            self.model.marketReturn = self.model.marketReturnAvg
         if len(self.people)==1: self.filingStatus=Single
         else: self.filingStatus=Married
 
@@ -236,13 +264,13 @@ class Balances:
         return 0
         
 def printYear(year,people,balances):
-    print(f"{year} {balances.totincome:4.0f} {balances.totExpenses:4.0f} {balances.taxable:5.0f} {balances.roth:5.0f} {balances.pretax:5.0f} {balances.fedtax:4.0f} {balances.statetax:4.0f} {balances.rmd:4.0f} {balances.pretaxWithdrawn:4.0f} {balances.convert:4.0f} {balances.health:4.0f} {balances.filingStatus:2d}")
+    print(f"{year} {balances.totincome:4.0f} {balances.totExpenses:4.0f} {balances.taxable:5.0f} {balances.roth:5.0f} {balances.pretax:5.0f} {balances.fedtax:4.0f} {balances.statetax:4.0f} {balances.rmd:4.0f} {balances.pretaxWithdrawn:4.0f} {balances.convert:4.0f} {balances.health:4.0f} {balances.model.marketReturn:5.2f} {balances.filingStatus:2d}")
 
 from finparams import modelParams,personParams
 model = Model(modelParams)
 model.people = [Person(personParams[0]),Person(personParams[1])]
 balances = Balances(model)
-print("Year Incm Exps  Txbl  Roth  Ptax  Fed   CA  RMD PtxW Cnvt Hlth FS")
+print("Year Incm Exps  Txbl  Roth  Ptax  Fed   CA  RMD PtxW Cnvt Hlth  Rtrn FS")
 while model.alive():
     balances.update()
     printYear(model.year,model.people,balances)
