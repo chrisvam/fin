@@ -44,11 +44,6 @@ class StateTax: # for california
     rates = (0.123,0.113,0.103,0.093,0.08,0.06,0.04,0.02,0.01)
     deduction = (5.54,11.08) # single/married
 
-class CapgainsTax:
-    brackets=((533.400,48.351,0), # single
-              (600.050,96.701,0)) # married
-    rates=(0.20,0.15,0.0)
-
 class Person:
     def __init__(self, dictionary):
         for k, v in dictionary.items():
@@ -86,8 +81,8 @@ class Balances:
             lastYear = SandP_InflationCorrectedReturns_Since1871[self.marketReturnsIndex]
             thisYear = SandP_InflationCorrectedReturns_Since1871[self.marketReturnsIndex+1]
             self.model.marketReturn = (thisYear/lastYear)-1
-            self.marketReturnsIndex+=1
-        else:
+            self.marketReturnsIndex+=1 # move forward a year
+        else: # use an average number
             self.model.marketReturn = self.model.marketReturnAvg
         if len(self.people)==1: self.filingStatus=Single
         else: self.filingStatus=Married
@@ -231,6 +226,7 @@ class Balances:
         # we don't have to divide up pretax balances
         age = self.people[0].age
         if age>=75:
+            assert age==RMDTable[age-75][0]
             yearsToLive = RMDTable[age-75][1]
             return self.pretax/yearsToLive
         else: return 0
@@ -257,11 +253,36 @@ class Balances:
                 #print('***',income,rate,brkt,amountInBracket,taxableIncome,filingStatus)
         return tax
 
-    def calcCapgainsTax(self,income,capgains):
-        for rate,bracket in zip(CapgainsTax.rates,CapgainsTax.brackets[self.filingStatus]):
-            if income>bracket:
-                return rate*capgains
-        return 0
+    # see calculator here: https://www.nerdwallet.com/article/taxes/capital-gains-tax-rates
+    def calcCapgainsTax(self,income,ltcg):
+        if self.filingStatus==Married:
+            threshold_0 = 89.250    # up to here, LTCG is taxed at 0%
+            threshold_15 = 553.850  # up to here, LTCG (after the 0% portion) is taxed at 15%
+        else:
+            threshold_0 = 44.625    # up to here, LTCG is taxed at 0%
+            threshold_15 = 492.300  # up to here, LTCG (after the 0% portion) is taxed at 15%
+
+        # Determine how much of the LTCG falls into the 0% bracket.
+        # If ordinary income is below the threshold, some LTCG will be "covered"
+        # by the 0% zone.
+        available_0_rate = max(0, threshold_0 - income)
+        portion_0 = min(ltcg, available_0_rate)
+
+        # Remaining LTCG after the 0% portion:
+        remaining_ltcg = ltcg - portion_0
+
+        # Next, determine how much LTCG falls into the 15% bracket.
+        # The 15% bracket starts at the greater of (income, threshold_0)
+        # and goes up to threshold_15.
+        current_income_after_0 = income + portion_0
+        available_15_rate = max(0, threshold_15 - current_income_after_0)
+        portion_15 = min(remaining_ltcg, available_15_rate)
+
+        # Any remaining LTCG falls into the 20% bracket.
+        portion_20 = remaining_ltcg - portion_15
+
+        tax = 0.15 * portion_15 + 0.20 * portion_20
+        return tax
         
 def printYear(year,people,balances):
     print(f"{year} {balances.totincome:4.0f} {balances.totExpenses:4.0f} {balances.taxable:5.0f} {balances.roth:5.0f} {balances.pretax:5.0f} {balances.fedtax:4.0f} {balances.statetax:4.0f} {balances.rmd:4.0f} {balances.pretaxWithdrawn:4.0f} {balances.convert:4.0f} {balances.health:4.0f} {balances.model.marketReturn:5.2f} {balances.filingStatus:2d}")
