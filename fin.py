@@ -116,9 +116,9 @@ class Balances:
                 self.roth+=self.convert # add to roth
                 self.pretax-=self.convert # remove from pretax
         self.incomeLookback.append(fedTaxableIncome) # simplification: this is not magi
-        self.fedtax = self.calcTax(fedTaxableIncome,FedTax) \
-            + self.calcCapgainsTax(self.income,capgains)
-        self.statetax = self.calcTax(stateTaxableIncome,StateTax)
+        self.fedtax,self.topBracket,self.topBracketAmount = self.calcTax(fedTaxableIncome,FedTax)
+        self.fedtax += self.calcCapgainsTax(self.income,capgains)
+        self.statetax,_,_ = self.calcTax(stateTaxableIncome,StateTax)
         # update totals with our contributions
         tottax = self.fedtax+self.statetax
 
@@ -246,14 +246,21 @@ class Balances:
 
     def calcTax(self,income,taxtype):
         tax=0
+        firsttime=1
+        topBracket=0
+        topBracketAmount=0
         # depends on the tax bracket table being in descending order
         for rate,bracket in zip(taxtype.rates,taxtype.brackets[self.filingStatus]):
-            if income>=bracket:
+            if income>bracket:
                 amountInBracket = income-bracket
                 tax += rate*amountInBracket
                 income -= amountInBracket
+                if firsttime:
+                    firsttime=0
+                    topBracket=rate
+                    topBracketAmount=amountInBracket
                 #print('***',income,rate,brkt,amountInBracket,taxableIncome,filingStatus)
-        return tax
+        return tax,topBracket,topBracketAmount
 
     # see calculator here: https://www.nerdwallet.com/article/taxes/capital-gains-tax-rates
     def calcCapgainsTax(self,income,ltcg):
@@ -287,13 +294,13 @@ class Balances:
         return tax
         
 def printYear(year,people,balances):
-    print(f"{year} {balances.totincome:4.0f} {balances.totExpenses:4.0f} {balances.taxable:5.0f} {balances.roth:5.0f} {balances.pretax:5.0f} {balances.fedtax:4.0f} {balances.statetax:4.0f} {balances.rmd:4.0f} {balances.pretaxWithdrawn:4.0f} {balances.convert:4.0f} {balances.health:4.0f} {balances.model.marketReturn:5.2f} {balances.filingStatus:2d}")
+    print(f"{year} {balances.totincome:4.0f} {balances.totExpenses:4.0f} {balances.taxable:5.0f} {balances.roth:5.0f} {balances.pretax:5.0f} {balances.fedtax:4.0f} {balances.statetax:4.0f} {balances.topBracket:4.2f} {balances.topBracketAmount:4.0f} {balances.rmd:4.0f} {balances.pretaxWithdrawn:4.0f} {balances.convert:4.0f} {balances.health:4.0f} {balances.model.marketReturn:5.2f} {balances.filingStatus:2d}")
 
 from finparams import modelParams,personParams
 model = Model(modelParams)
 model.people = [Person(personParams[0]),Person(personParams[1])]
 balances = Balances(model)
-print("Year Incm Exps  Txbl  Roth  Ptax  Fed   CA  RMD PtxW Cnvt Hlth  Rtrn FS")
+print("Year Incm Exps  Txbl  Roth  Ptax  Fed   CA Brkt BrkA  RMD PtxW Cnvt Hlth  Rtrn FS")
 while model.alive():
     balances.update()
     printYear(model.year,model.people,balances)
