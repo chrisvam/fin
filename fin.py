@@ -89,7 +89,7 @@ class Balances:
 
         self.income,self.socsecIncome = self.calcIncome()
         # how much are we contributing to roth/pretax
-        rothContrib,pretaxContrib = self.calcRothAndPretaxContrib(self.income)
+        rothContrib,pretaxContrib = self.calcRothAndPretaxContrib()
         self.rmd = self.calcRMD()
         self.pretax-=self.rmd
         # hack: add in last last year's pretax withdrawal to this year's income
@@ -126,26 +126,28 @@ class Balances:
         self.roth += rothContrib
         self.health = self.calcHealth(self.incomeLookback[0])
         self.totExpenses = rothContrib+pretaxContrib+tottax+self.model.expenses+self.health
-        # hack: will compute taxes on this next year
+        # hack to avoid recursion: will compute taxes on this next year
         self.pretaxWithdrawn=0
         netcash = self.income - self.totExpenses
-        if netcash >= 0: # don't need to withdraw, put excess in taxable
-            self.taxable += self.income-self.totExpenses
-        else: # we have to withdraw
+        if netcash >= 0: # have excess, put in taxable
+            self.taxable += netcash
+        else: # we have to withdraw to cover the shortfall
             # take from taxable first
-            if self.taxable+netcash>0: self.taxable+=netcash
+            if self.taxable+netcash>=0:
+                # have enough in taxable to cover
+                self.taxable+=netcash
             else: # not enough in taxable, try pretax
                 netcash+=self.taxable # drain taxable
                 self.taxable=0
                 # is there enough in pretax?
-                if self.pretax+netcash>0:
-                    self.pretaxWithdrawn= -netcash
+                if self.pretax+netcash>=0:
+                    self.pretaxWithdrawn = -netcash
                     self.pretax+=netcash
                 else: # not enough in pretax, try roth
                     netcash+=self.pretax # drain pretax
-                    self.pretaxWithdrawn= self.pretax
+                    self.pretaxWithdrawn = self.pretax
                     self.pretax=0
-                    if self.roth+netcash>0: self.roth+=netcash
+                    if self.roth+netcash>=0: self.roth+=netcash
                     else:
                         print('*** bankrupt ***')
                         import sys
@@ -202,13 +204,13 @@ class Balances:
     
         return 0
 
-    def calcRothAndPretaxContrib(self,income):
+    def calcRothAndPretaxContrib(self):
         roth=0
         pretax=0
         for p in self.people:
             if p.age < p.retireAge:
-                roth+=income*p.rothFraction
-                pretax+=income*p.pretaxFraction
+                roth+=p.salary*p.rothFraction
+                pretax+=p.salary*p.pretaxFraction
         return roth,pretax
 
     def calcHealth(self,income):
